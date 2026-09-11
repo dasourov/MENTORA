@@ -1,0 +1,188 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+/*
+ * Mentora Single-File Central Color & Typography System Definition
+ *
+ * All theme colors and typography are configured here in a single file:
+ * - Primary Brand Green: #006a4e
+ * - Accent Crimson Red: #ec1c24
+ * - Background: #FFFFFF (White)
+ * - Typography: Plus Jakarta Sans & Outfit
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-brand-red: #ec1c24;
+  --color-brand-green: #006a4e;
+
+  --shadow-card: var(--shadow-card);
+  --shadow-lift: var(--shadow-lift);
+}
+
+:root {
+  --radius: 0.875rem;
+
+  /* -------------------------------------------------------------
+   * CENTRAL PALETTE DEFINITIONS (Single Source of Truth)
+   * Primary Brand Green: #006a4e
+   * Accent Crimson Red: #ec1c24
+   * Background: #FFFFFF (White)
+   * ------------------------------------------------------------- */
+  --primary-green: #006a4e;
+  --primary-green-hover: #00523d;
+  --light-green-bg: #e6f2ee;
+  --border-green: #b3dacd;
+
+  --accent-red: #ec1c24;
+  --accent-red-hover: #c9141b;
+  --light-red-bg: #fdf2f2;
+
+  --main-text: #0f172a;
+  --secondary-text: #64748b;
+  --light-bg: #ffffff;
+
+  /* -------------------------------------------------------------
+   * SEMANTIC COMPONENT MAP
+   * ------------------------------------------------------------- */
+  --background: #ffffff;
+  --foreground: var(--main-text);
+  --surface: #ffffff;
+  --card: #ffffff;
+  --card-foreground: var(--main-text);
+  --popover: #ffffff;
+  --popover-foreground: var(--main-text);
+
+  --primary: #006a4e;
+  --primary-foreground: #ffffff;
+
+  --secondary: #e6f2ee;
+  --secondary-foreground: #006a4e;
+  --muted: #f8fafc;
+  --muted-foreground: var(--secondary-text);
+  --accent: #e6f2ee;
+  --accent-foreground: #006a4e;
+
+  --destructive: #ec1c24;
+  --destructive-foreground: #ffffff;
+  --success: #006a4e;
+  --success-foreground: #ffffff;
+  --warning: #f59e0b;
+  --warning-foreground: #ffffff;
+
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #006a4e;
+
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 4px 16px -2px rgba(0, 106, 78, 0.08);
+  --shadow-lift: 0 10px 30px -5px rgba(0, 106, 78, 0.18), 0 4px 12px -2px rgba(0, 0, 0, 0.05);
+}
+
+.dark {
+  --background: #090d16;
+  --foreground: #f8fafc;
+  --surface: #0f172a;
+  --card: #0f172a;
+  --card-foreground: #f8fafc;
+  --popover: #0f172a;
+  --popover-foreground: #f8fafc;
+  --primary: #006a4e;
+  --primary-foreground: #ffffff;
+  --secondary: #1e293b;
+  --secondary-foreground: #34d399;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --accent: #1e293b;
+  --accent-foreground: #34d399;
+  --destructive: #ec1c24;
+  --destructive-foreground: #ffffff;
+  --border: #1e293b;
+  --input: #1e293b;
+  --ring: #006a4e;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    color-scheme: light;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-sans);
+    letter-spacing: -0.025em;
+  }
+
+  code, kbd, samp, pre {
+    font-family: var(--font-mono);
+  }
+}
+
+@utility label-caps {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+@utility glow-primary {
+  box-shadow: 0 4px 20px -4px rgba(0, 106, 78, 0.35);
+}
+
+@utility card-human-hover {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease;
+
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lift);
+    border-color: color-mix(in oklab, var(--primary) 40%, transparent);
+  }
+}
