@@ -92,7 +92,7 @@ function Index() {
 
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-border bg-background">
-        <div className="mx-auto grid max-w-7xl gap-12 px-4 py-16 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16 lg:px-8 lg:py-24">
+        <div className="mx-auto grid max-w-7xl gap-12 px-4 pt-4 pb-14 sm:px-6 sm:pt-6 sm:pb-18 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16 lg:px-8 lg:pt-8 lg:pb-20">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-secondary px-4 py-1.5 text-xs font-bold text-primary shadow-xs">
               <ShieldCheck className="h-4 w-4 fill-primary/20 text-primary" /> 240+ Verified Mentors Active
