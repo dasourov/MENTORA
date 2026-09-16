@@ -19,6 +19,7 @@ export type AccountStatus = "active" | "suspended" | "deleted" | null;
 export type UserProfile = {
   id: string;
   auth_user_id: string;
+  username?: string;
   full_name: string;
   email: string;
   auth_provider: "email" | "google";
@@ -61,6 +62,7 @@ const initialUsers: UserProfile[] = [
   {
     id: "user-student-demo",
     auth_user_id: "auth-student-1",
+    username: "rafiul",
     full_name: "Rafiul Islam",
     email: "student@example.com",
     auth_provider: "email",

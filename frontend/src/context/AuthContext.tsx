@@ -1,12 +1,20 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import {
+  getToken,
+  setToken,
+  apiLogin,
+  apiRegister,
+  apiGetMe,
+  apiSelectRole,
+  apiSaveOnboarding,
   apiCheckEmail,
-  apiCreateUser,
-  apiGetUserByEmail,
-  apiUpdateUser,
-  getCurrentUserId,
+  apiLogout,
+  apiUpdateProfile,
+  apiSendPasscode,
+  apiVerifyPasscode,
+} from "@/lib/api";
+import {
   resolveAuthenticatedRoute,
-  setCurrentUserId,
   type AccountStatus,
   type AuthState,
   type OnboardingStatus,
@@ -17,16 +25,17 @@ import {
 type AuthContextType = AuthState & {
   checkEmail: (email: string) => Promise<{ exists: boolean; verified?: boolean }>;
   signIn: (email: string, password: string, returnTo?: string) => Promise<{ success: boolean; target?: string; error?: string }>;
-  quickDemoLogin: (role: "student" | "advisor") => Promise<{ success: boolean; target: string }>;
-  signUp: (data: { full_name: string; email: string; password: string; role?: "student" | "advisor" }) => Promise<{ success: boolean; target?: string; error?: string }>;
-  signInWithGoogle: () => Promise<{ success: boolean; target?: string }>;
+  signUp: (data: { full_name: string; email: string; password: string; role?: "student" | "advisor" }) => Promise<{ success: boolean; requires_verification?: boolean; email?: string; target?: string; error?: string }>;
   signOut: () => void;
+  sendPasscode: (email: string, purpose?: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+  verifyPasscode: (email: string, code: string) => Promise<{ success: boolean; target?: string; error?: string }>;
   sendVerificationEmail: (email: string) => Promise<boolean>;
   verifyEmail: () => Promise<boolean>;
   selectRole: (role: "student" | "advisor") => Promise<{ success: boolean; target: string }>;
   saveOnboardingStep: (stepData: Record<string, any>, stepName: string, isLastStep?: boolean) => Promise<{ target: string }>;
   resetPassword: (email: string) => Promise<boolean>;
   resolveRoute: (returnTo?: string) => string;
+  updateProfile: (updates: Partial<UserProfile>, identifier?: string) => Promise<UserProfile>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -37,14 +46,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     async function initAuth() {
-      const currentId = getCurrentUserId();
-      if (currentId) {
+      const token = getToken();
+      if (token) {
         try {
-          const users = JSON.parse(localStorage.getItem("mentora_users_db") || "[]");
-          const foundUser = users.find((u: UserProfile) => u.id === currentId) || null;
-          setUser(foundUser);
-        } catch (e) {
-          console.error("Failed to restore session", e);
+          const profile = await apiGetMe();
+          setUser(profile);
+        } catch (err) {
+          console.warn("Stored token is invalid or expired; resetting session.", err);
+          setToken(null);
+          setUser(null);
         }
       }
       setIsLoading(false);
@@ -53,120 +63,100 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const checkEmail = async (email: string) => {
-    return apiCheckEmail(email);
-  };
-
-  const signIn = async (email: string, _password: string, returnTo?: string) => {
-    setIsLoading(true);
-    let existingUser = await apiGetUserByEmail(email);
-
-    // Auto-create or seed if not present
-    if (!existingUser) {
-      const isAdvisor = email.includes("advisor") || email.includes("mentor");
-      existingUser = await apiCreateUser({
-        full_name: email.split("@")[0]?.replace(".", " ") || "User",
-        email: email,
-        auth_provider: "email",
-      });
-      existingUser = await apiUpdateUser(existingUser.id, {
-        email_verified: true,
-        role: isAdvisor ? "advisor" : "student",
-        onboarding_status: "completed",
-        ...(isAdvisor ? { advisor_verification_status: "approved" as const } : {}),
-      });
+    try {
+      return await apiCheckEmail(email);
+    } catch {
+      return { exists: false, verified: false };
     }
-
-    setCurrentUserId(existingUser.id);
-    setUser(existingUser);
-    setIsLoading(false);
-    const target = resolveAuthenticatedRoute(existingUser, returnTo);
-    return { success: true, target };
   };
 
-  const quickDemoLogin = async (role: "student" | "advisor") => {
+  const signIn = async (email: string, password: string, returnTo?: string) => {
     setIsLoading(true);
-    const demoEmail = role === "student" ? "student@example.com" : "advisor@example.com";
-    let demoUser = await apiGetUserByEmail(demoEmail);
-
-    if (!demoUser) {
-      demoUser = await apiCreateUser({
-        full_name: role === "student" ? "Rafiul Islam (Student)" : "Tanvir Ahmed (Advisor)",
-        email: demoEmail,
-        auth_provider: "email",
-      });
-      demoUser = await apiUpdateUser(demoUser.id, {
-        email_verified: true,
-        role,
-        onboarding_status: "completed",
-        ...(role === "advisor" ? { advisor_verification_status: "approved" as const } : {}),
-      });
+    try {
+      const res = await apiLogin(email, password, returnTo);
+      setToken(res.access_token);
+      setUser(res.user);
+      setIsLoading(false);
+      return { success: true, target: res.target };
+    } catch (err: any) {
+      setIsLoading(false);
+      return {
+        success: false,
+        error: err?.message || "Invalid email or password. Please try again.",
+      };
     }
-
-    setCurrentUserId(demoUser.id);
-    setUser(demoUser);
-    setIsLoading(false);
-    const target = resolveAuthenticatedRoute(demoUser);
-    return { success: true, target };
   };
 
-  const signUp = async (data: { full_name: string; email: string; password: string; role?: "student" | "advisor" }) => {
+  const signUp = async (data: {
+    full_name: string;
+    email: string;
+    password: string;
+    role?: "student" | "advisor";
+  }) => {
     setIsLoading(true);
-    let newUser = await apiCreateUser({
-      full_name: data.full_name,
-      email: data.email,
-      auth_provider: "email",
-    });
-
-    if (data.role) {
-      newUser = await apiUpdateUser(newUser.id, {
-        role: data.role,
-        onboarding_status: data.role === "student" ? "profile" : "personal",
-        email_verified: true,
-      });
+    try {
+      const res = await apiRegister(data);
+      setIsLoading(false);
+      if (res.requires_verification) {
+        return {
+          success: true,
+          requires_verification: true,
+          email: res.email,
+          target: res.target || "/verify-email",
+        };
+      }
+      if (res.access_token && res.user) {
+        setToken(res.access_token);
+        setUser(res.user);
+      }
+      return { success: true, target: res.target };
+    } catch (err: any) {
+      setIsLoading(false);
+      return {
+        success: false,
+        error: err?.message || "Unable to create account. Please try again.",
+      };
     }
-
-    setCurrentUserId(newUser.id);
-    setUser(newUser);
-    setIsLoading(false);
-
-    const target = newUser.role
-      ? newUser.role === "student"
-        ? "/student/dashboard"
-        : "/advisor/dashboard"
-      : newUser.email_verified
-        ? "/onboarding/select-role"
-        : "/verify-email";
-
-    return { success: true, target };
   };
 
-  const signInWithGoogle = async () => {
+  const sendPasscode = async (email: string, purpose = "registration") => {
+    try {
+      const res = await apiSendPasscode(email, purpose);
+      return { success: true, message: res.message };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err?.message || "Failed to send passcode. Please try again.",
+      };
+    }
+  };
+
+  const verifyPasscode = async (email: string, code: string) => {
     setIsLoading(true);
-    let googleUser = await apiGetUserByEmail("student.google@mentora.com");
-    if (!googleUser) {
-      googleUser = await apiCreateUser({
-        full_name: "Sabbir Ahmed (Google)",
-        email: "student.google@mentora.com",
-        auth_provider: "google",
-      });
-      googleUser = await apiUpdateUser(googleUser.id, {
-        email_verified: true,
-        role: "student",
-        onboarding_status: "completed",
-      });
+    try {
+      const res = await apiVerifyPasscode(email, code);
+      setToken(res.access_token);
+      setUser(res.user);
+      setIsLoading(false);
+      return { success: true, target: res.target };
+    } catch (err: any) {
+      setIsLoading(false);
+      return {
+        success: false,
+        error: err?.message || "Invalid or expired passcode. Please try again.",
+      };
     }
-
-    setCurrentUserId(googleUser.id);
-    setUser(googleUser);
-    setIsLoading(false);
-
-    const target = resolveAuthenticatedRoute(googleUser);
-    return { success: true, target };
   };
 
-  const signOut = () => {
-    setCurrentUserId(null);
-    setUser(null);
+  const signOut = async () => {
+    try {
+      await apiLogout();
+    } catch {
+      // Ignore network errors on logout
+    } finally {
+      setToken(null);
+      setUser(null);
+    }
   };
 
   const sendVerificationEmail = async (_email: string) => {
@@ -175,42 +165,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const verifyEmail = async () => {
     if (!user) return false;
-    const updated = await apiUpdateUser(user.id, { email_verified: true });
-    setUser(updated);
+    setUser({ ...user, email_verified: true });
     return true;
   };
 
   const selectRole = async (role: "student" | "advisor") => {
-    if (!user) throw new Error("Unauthenticated");
-    const initialStatus = role === "student" ? "profile" : "personal";
-    const updated = await apiUpdateUser(user.id, {
-      role,
-      onboarding_status: initialStatus,
-      current_step: initialStatus,
-    });
-    setUser(updated);
-    const target = role === "student" ? "/student/onboarding" : "/advisor/onboarding";
-    return { success: true, target };
+    try {
+      const res = await apiSelectRole(role);
+      setToken(res.access_token);
+      setUser(res.user);
+      return { success: true, target: res.target };
+    } catch (err: any) {
+      throw new Error(err?.message || "Failed to select role.");
+    }
   };
 
-  const saveOnboardingStep = async (stepData: Record<string, any>, stepName: string, isLastStep = false) => {
-    if (!user) throw new Error("Unauthenticated");
-    const nextStatus = isLastStep
-      ? user.role === "advisor"
-        ? "submitted"
-        : "completed"
-      : (stepName as OnboardingStatus);
-
-    const updated = await apiUpdateUser(user.id, {
-      ...stepData,
-      onboarding_status: nextStatus,
-      current_step: stepName,
-      ...(isLastStep && user.role === "advisor" ? { advisor_verification_status: "pending" } : {}),
-    });
-
-    setUser(updated);
-    const target = resolveAuthenticatedRoute(updated);
-    return { target };
+  const saveOnboardingStep = async (
+    stepData: Record<string, any>,
+    stepName: string,
+    isLastStep = false
+  ) => {
+    try {
+      const res = await apiSaveOnboarding(stepData, stepName, isLastStep);
+      setToken(res.access_token);
+      setUser(res.user);
+      return { target: res.target };
+    } catch (err: any) {
+      throw new Error(err?.message || "Failed to save onboarding step.");
+    }
   };
 
   const resetPassword = async (_email: string) => {
@@ -219,6 +201,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const resolveRoute = (returnTo?: string) => {
     return resolveAuthenticatedRoute(user, returnTo);
+  };
+
+  const updateProfile = async (updates: Partial<UserProfile>, identifier?: string) => {
+    try {
+      const updated = await apiUpdateProfile(updates, identifier);
+      setUser(updated);
+      return updated;
+    } catch (err: any) {
+      throw new Error(err?.message || "Failed to update profile.");
+    }
   };
 
   const authState: AuthState = {
@@ -238,16 +230,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ...authState,
         checkEmail,
         signIn,
-        quickDemoLogin,
         signUp,
-        signInWithGoogle,
         signOut,
         sendVerificationEmail,
         verifyEmail,
+        sendPasscode,
+        verifyPasscode,
         selectRole,
         saveOnboardingStep,
         resetPassword,
         resolveRoute,
+        updateProfile,
       }}
     >
       {children}

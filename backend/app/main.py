@@ -5,8 +5,10 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import SQLAlchemyError
 
+from sqlalchemy import inspect, text
 from app.core.config import settings
-from app.core.database import engine, Base
+from app.core.database import engine
+from app.models import Base, User
 from app.api.v1.router import api_router
 
 
@@ -14,6 +16,16 @@ from app.api.v1.router import api_router
 async def lifespan(app: FastAPI):
     # Ensure database schema is initialized on startup
     Base.metadata.create_all(bind=engine)
+    try:
+        inspector = inspect(engine)
+        if "users" in inspector.get_table_names():
+            columns = [c["name"] for c in inspector.get_columns("users")]
+            if "username" not in columns:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN username VARCHAR(64)"))
+                print("[Schema Sync] Added 'username' column to 'users' table.")
+    except Exception as e:
+        print(f"[Schema Sync Notice] {e}")
     yield
 
 

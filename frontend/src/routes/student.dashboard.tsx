@@ -47,11 +47,18 @@ function StudentDashboardContent() {
                 Targeting: <strong className="text-foreground">{user?.intended_country || "Germany"}</strong> • {user?.subject_field || "Computer Science"}
               </p>
             </div>
-            <Button asChild size="lg" className="font-bold shadow-lift">
-              <Link to="/advisers">
-                <Search className="mr-1.5 h-4 w-4" /> Find Mentors
-              </Link>
-            </Button>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <Button asChild variant="outline" size="lg" className="font-bold">
+                <Link to={`/student/${user?.username || user?.id || "me"}` as any}>
+                  <User className="mr-1.5 h-4 w-4" /> My Profile
+                </Link>
+              </Button>
+              <Button asChild size="lg" className="font-bold shadow-lift">
+                <Link to="/advisers">
+                  <Search className="mr-1.5 h-4 w-4" /> Find Mentors
+                </Link>
+              </Button>
+            </div>
           </div>
 
           {/* Stats Overview */}

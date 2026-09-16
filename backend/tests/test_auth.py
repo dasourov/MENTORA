@@ -61,15 +61,22 @@ def test_login_and_me():
     print("PASS: Protected /me endpoint with Bearer token")
 
 
-def test_quick_demo_login():
-    for role in ["advisor", "admin", "student"]:
-        res = client.post("/api/v1/auth/quick-demo-login", json={"role": role})
-        assert res.status_code == 200, res.text
-        data = res.json()
-        assert data["success"] is True
-        assert data["user"]["role"] == role
-        assert "access_token" in data
-    print("PASS: Quick demo login for all roles")
+def test_invalid_login_rejections():
+    # 1. Non-existent email should return 401 Unauthorized
+    res1 = client.post(
+        "/api/v1/auth/login",
+        json={"email": "nonexistent_user_9999@example.com", "password": "AnyPassword123!"},
+    )
+    assert res1.status_code == 401, res1.text
+    print("PASS: Rejection of non-existent account with 401")
+
+    # 2. Incorrect password should return 401 Unauthorized
+    res2 = client.post(
+        "/api/v1/auth/login",
+        json={"email": "student@example.com", "password": "WrongPassword123!"},
+    )
+    assert res2.status_code == 401, res2.text
+    print("PASS: Rejection of incorrect password with 401")
 
 
 def test_register_and_onboarding():
@@ -91,6 +98,19 @@ def test_register_and_onboarding():
     assert reg_data["user"]["email"] == test_email
     assert reg_data["user"]["role"] == "student"
     print("PASS: User registration")
+
+    # Duplicate registration should return 400 Bad Request
+    dup_res = client.post(
+        "/api/v1/auth/register",
+        json={
+            "full_name": "Test Student Duplicate",
+            "email": test_email,
+            "password": "SecurePassword123!",
+            "role": "student",
+        },
+    )
+    assert dup_res.status_code == 400, dup_res.text
+    print("PASS: Duplicate registration rejection with 400")
 
     # Update onboarding step
     onboarding_res = client.put(
@@ -118,7 +138,7 @@ def run_all():
     test_health()
     test_check_email()
     test_login_and_me()
-    test_quick_demo_login()
+    test_invalid_login_rejections()
     test_register_and_onboarding()
     print("\nALL BACKEND TESTS PASSED SUCCESSFULLY! ---\n")
 

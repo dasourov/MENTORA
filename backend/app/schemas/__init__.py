@@ -3,10 +3,8 @@ from app.schemas.auth import (
     TokenPayload,
     LoginRequest,
     RegisterRequest,
-    QuickDemoLoginRequest,
     CheckEmailRequest,
     CheckEmailResponse,
-    GoogleAuthRequest,
     SelectRoleRequest,
     VerifyEmailRequest,
 )
@@ -16,20 +14,28 @@ from app.schemas.user import (
     OnboardingStepRequest,
     AuthResponse,
 )
+from app.schemas.advisor import (
+    AdvisorService,
+    AdvisorBase,
+    AdvisorRead,
+    AdvisorListResponse,
+)
 
 __all__ = [
     "Token",
     "TokenPayload",
     "LoginRequest",
     "RegisterRequest",
-    "QuickDemoLoginRequest",
     "CheckEmailRequest",
     "CheckEmailResponse",
-    "GoogleAuthRequest",
     "SelectRoleRequest",
     "VerifyEmailRequest",
     "UserRead",
     "UserUpdate",
     "OnboardingStepRequest",
     "AuthResponse",
+    "AdvisorService",
+    "AdvisorBase",
+    "AdvisorRead",
+    "AdvisorListResponse",
 ]

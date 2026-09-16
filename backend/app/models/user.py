@@ -13,6 +13,7 @@ class User(Base):
 
     id = Column(String(64), primary_key=True, default=generate_uuid, index=True)
     auth_user_id = Column(String(64), unique=True, index=True, default=generate_uuid)
+    username = Column(String(64), unique=True, index=True, nullable=True)
     full_name = Column(String(255), nullable=False)
     email = Column(String(255), unique=True, index=True, nullable=False)
     password_hash = Column(String(255), nullable=True)
@@ -51,6 +52,7 @@ class User(Base):
         return {
             "id": self.id,
             "auth_user_id": self.auth_user_id,
+            "username": self.username,
             "full_name": self.full_name,
             "email": self.email,
             "auth_provider": self.auth_provider,

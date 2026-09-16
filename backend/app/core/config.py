@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     # Database: Neon PostgreSQL or local SQLite
     DATABASE_URL: str = "sqlite:///./mentora.db"
 
+    # Resend Email Service
+    RESEND_API_KEY: str = ""
+    RESEND_FROM_EMAIL: str = "Mentora <onboarding@resend.dev>"
+
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:8080",
@@ -40,9 +44,10 @@ class Settings(BaseSettings):
     @property
     def sync_database_url(self) -> str:
         url = self.DATABASE_URL
-        # Neon URLs commonly start with postgres://, modern SQLAlchemy requires postgresql://
         if url.startswith("postgres://"):
-            url = url.replace("postgres://", "postgresql://", 1)
+            url = url.replace("postgres://", "postgresql+psycopg://", 1)
+        elif url.startswith("postgresql://") and not url.startswith("postgresql+"):
+            url = url.replace("postgresql://", "postgresql+psycopg://", 1)
         return url
 
     model_config = SettingsConfigDict(

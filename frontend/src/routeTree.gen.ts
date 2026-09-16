@@ -29,6 +29,7 @@ import { Route as AdvisorDashboardRouteImport } from './routes/advisor.dashboard
 import { Route as AdvisorOnboardingRouteImport } from './routes/advisor.onboarding'
 import { Route as BookAdviserIdRouteImport } from './routes/book.$adviserId'
 import { Route as OnboardingSelectRoleRouteImport } from './routes/onboarding.select-role'
+import { Route as StudentStudentIdRouteImport } from './routes/student.$studentId'
 import { Route as StudentDashboardRouteImport } from './routes/student.dashboard'
 import { Route as StudentOnboardingRouteImport } from './routes/student.onboarding'
 
@@ -132,6 +133,11 @@ const OnboardingSelectRoleRoute = OnboardingSelectRoleRouteImport.update({
   path: '/select-role',
   getParentRoute: () => OnboardingRoute,
 } as any)
+const StudentStudentIdRoute = StudentStudentIdRouteImport.update({
+  id: '/student/$studentId',
+  path: '/student/$studentId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudentDashboardRoute = StudentDashboardRouteImport.update({
   id: '/student/dashboard',
   path: '/student/dashboard',
@@ -163,6 +169,7 @@ export interface FileRoutesByFullPath {
   '/advisor/onboarding': typeof AdvisorOnboardingRoute
   '/book/$adviserId': typeof BookAdviserIdRoute
   '/onboarding/select-role': typeof OnboardingSelectRoleRoute
+  '/student/$studentId': typeof StudentStudentIdRoute
   '/student/dashboard': typeof StudentDashboardRoute
   '/student/onboarding': typeof StudentOnboardingRoute
   '/advisers/': typeof AdvisersIndexRoute
@@ -187,6 +194,7 @@ export interface FileRoutesByTo {
   '/advisor/onboarding': typeof AdvisorOnboardingRoute
   '/book/$adviserId': typeof BookAdviserIdRoute
   '/onboarding/select-role': typeof OnboardingSelectRoleRoute
+  '/student/$studentId': typeof StudentStudentIdRoute
   '/student/dashboard': typeof StudentDashboardRoute
   '/student/onboarding': typeof StudentOnboardingRoute
   '/advisers': typeof AdvisersIndexRoute
@@ -212,6 +220,7 @@ export interface FileRoutesById {
   '/advisor/onboarding': typeof AdvisorOnboardingRoute
   '/book/$adviserId': typeof BookAdviserIdRoute
   '/onboarding/select-role': typeof OnboardingSelectRoleRoute
+  '/student/$studentId': typeof StudentStudentIdRoute
   '/student/dashboard': typeof StudentDashboardRoute
   '/student/onboarding': typeof StudentOnboardingRoute
   '/advisers/': typeof AdvisersIndexRoute
@@ -238,6 +247,7 @@ export interface FileRouteTypes {
     | '/advisor/onboarding'
     | '/book/$adviserId'
     | '/onboarding/select-role'
+    | '/student/$studentId'
     | '/student/dashboard'
     | '/student/onboarding'
     | '/advisers/'
@@ -262,6 +272,7 @@ export interface FileRouteTypes {
     | '/advisor/onboarding'
     | '/book/$adviserId'
     | '/onboarding/select-role'
+    | '/student/$studentId'
     | '/student/dashboard'
     | '/student/onboarding'
     | '/advisers'
@@ -286,6 +297,7 @@ export interface FileRouteTypes {
     | '/advisor/onboarding'
     | '/book/$adviserId'
     | '/onboarding/select-role'
+    | '/student/$studentId'
     | '/student/dashboard'
     | '/student/onboarding'
     | '/advisers/'
@@ -310,6 +322,7 @@ export interface RootRouteChildren {
   AdvisorDashboardRoute: typeof AdvisorDashboardRoute
   AdvisorOnboardingRoute: typeof AdvisorOnboardingRoute
   BookAdviserIdRoute: typeof BookAdviserIdRoute
+  StudentStudentIdRoute: typeof StudentStudentIdRoute
   StudentDashboardRoute: typeof StudentDashboardRoute
   StudentOnboardingRoute: typeof StudentOnboardingRoute
   AdvisersIndexRoute: typeof AdvisersIndexRoute
@@ -457,6 +470,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingSelectRoleRouteImport
       parentRoute: typeof OnboardingRoute
     }
+    '/student/$studentId': {
+      id: '/student/$studentId'
+      path: '/student/$studentId'
+      fullPath: '/student/$studentId'
+      preLoaderRoute: typeof StudentStudentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/student/dashboard': {
       id: '/student/dashboard'
       path: '/student/dashboard'
@@ -505,6 +525,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdvisorDashboardRoute: AdvisorDashboardRoute,
   AdvisorOnboardingRoute: AdvisorOnboardingRoute,
   BookAdviserIdRoute: BookAdviserIdRoute,
+  StudentStudentIdRoute: StudentStudentIdRoute,
   StudentDashboardRoute: StudentDashboardRoute,
   StudentOnboardingRoute: StudentOnboardingRoute,
   AdvisersIndexRoute: AdvisersIndexRoute,

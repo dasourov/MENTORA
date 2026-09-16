@@ -28,10 +28,6 @@ class RegisterRequest(BaseModel):
     role: Optional[Literal["student", "advisor"]] = None
 
 
-class QuickDemoLoginRequest(BaseModel):
-    role: Literal["student", "advisor", "admin"]
-
-
 class CheckEmailRequest(BaseModel):
     email: EmailStr
 
@@ -41,15 +37,37 @@ class CheckEmailResponse(BaseModel):
     verified: bool = False
 
 
-class GoogleAuthRequest(BaseModel):
-    email: EmailStr
-    full_name: str
-    id_token: Optional[str] = None
-
-
 class SelectRoleRequest(BaseModel):
     role: Literal["student", "advisor"]
 
 
 class VerifyEmailRequest(BaseModel):
     code: Optional[str] = None
+
+
+class SendPasscodeRequest(BaseModel):
+    email: EmailStr
+    purpose: str = "registration"
+
+
+class VerifyPasscodeRequest(BaseModel):
+    email: EmailStr
+    code: str = Field(..., min_length=4, max_length=16)
+
+
+class PasscodeResponse(BaseModel):
+    success: bool = True
+    message: str
+    email: str
+    expires_in_seconds: int = 600
+
+
+class RegisterResponse(BaseModel):
+    success: bool = True
+    requires_verification: bool = True
+    email: str
+    message: str
+    access_token: Optional[str] = None
+    token_type: str = "bearer"
+    target: Optional[str] = None
+

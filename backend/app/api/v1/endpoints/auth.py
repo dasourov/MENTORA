@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+import secrets
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -7,15 +8,19 @@ from app.core.database import get_db
 from app.core.security import get_password_hash, verify_password, create_access_token
 from app.core.config import settings
 from app.models.user import User, generate_uuid
+from app.models.verification import EmailVerification
+from app.services.email import send_verification_passcode_email
 from app.schemas.auth import (
     LoginRequest,
     RegisterRequest,
-    QuickDemoLoginRequest,
     CheckEmailRequest,
     CheckEmailResponse,
-    GoogleAuthRequest,
     SelectRoleRequest,
     VerifyEmailRequest,
+    SendPasscodeRequest,
+    VerifyPasscodeRequest,
+    PasscodeResponse,
+    RegisterResponse,
 )
 from app.schemas.user import UserRead, AuthResponse, OnboardingStepRequest
 from app.api.deps import get_current_user
@@ -48,6 +53,45 @@ def resolve_route(user: User, return_to: Optional[str] = None) -> str:
     return "/"
 
 
+def _create_and_send_passcode(
+    email: str, full_name: str, db: Session, purpose: str = "registration"
+) -> str:
+    """Invalidates older active passcodes, generates a 6-digit numeric OTP, stores it in DB, and dispatches via Resend."""
+    email_clean = email.strip().lower()
+
+    # Invalidate existing active verification records for this email
+    db.query(EmailVerification).filter(
+        EmailVerification.email == email_clean,
+        EmailVerification.purpose == purpose,
+        EmailVerification.is_used == False,
+    ).update({"is_used": True})
+
+    # Generate cryptographically strong 6-digit numeric passcode
+    code = f"{secrets.randbelow(900000) + 100000}"
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+
+    verification = EmailVerification(
+        email=email_clean,
+        code=code,
+        purpose=purpose,
+        expires_at=expires_at,
+        attempts=0,
+        max_attempts=5,
+        is_used=False,
+    )
+    db.add(verification)
+    db.commit()
+
+    # Dispatch email through Resend
+    send_verification_passcode_email(
+        email=email_clean,
+        passcode=code,
+        full_name=full_name or "Student",
+    )
+
+    return code
+
+
 @router.post("/check-email", response_model=CheckEmailResponse, tags=["Auth"])
 def check_email(payload: CheckEmailRequest, db: Session = Depends(get_db)):
     email_clean = payload.email.strip().lower()
@@ -58,46 +102,189 @@ def check_email(payload: CheckEmailRequest, db: Session = Depends(get_db)):
     )
 
 
-@router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED, tags=["Auth"])
+@router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED, tags=["Auth"])
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
+    """Stage 1 of registration: creates unverified user and dispatches 6-digit Resend email passcode."""
     email_clean = payload.email.strip().lower()
     existing = db.query(User).filter(User.email == email_clean).first()
-    if existing:
+
+    if existing and existing.email_verified:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="An account with this email address already exists.",
+            detail="An account with this email address already exists. Please sign in.",
         )
 
-    user_id = generate_uuid()
-    initial_status = "role_selection"
-    if payload.role:
-        initial_status = "profile" if payload.role == "student" else "personal"
+    user_role = payload.role or "student"
+    initial_status = "profile" if user_role == "student" else "personal"
 
-    new_user = User(
-        id=user_id,
-        auth_user_id=f"auth-{user_id}",
-        full_name=payload.full_name.strip(),
+    if existing and not existing.email_verified:
+        # Re-use existing unverified profile
+        existing.full_name = payload.full_name.strip()
+        existing.password_hash = get_password_hash(payload.password)
+        existing.role = user_role
+        existing.onboarding_status = initial_status
+        existing.current_step = initial_status
+        existing.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(existing)
+        target_user = existing
+    else:
+        user_id = generate_uuid()
+        new_user = User(
+            id=user_id,
+            auth_user_id=f"auth-{user_id}",
+            full_name=payload.full_name.strip(),
+            email=email_clean,
+            password_hash=get_password_hash(payload.password),
+            auth_provider="email",
+            email_verified=False,  # Requires passcode verification
+            role=user_role,
+            onboarding_status=initial_status,
+            current_step=initial_status,
+            account_status="active",
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        target_user = new_user
+
+    # Generate and send passcode via Resend
+    _create_and_send_passcode(
         email=email_clean,
-        password_hash=get_password_hash(payload.password),
-        auth_provider="email",
-        email_verified=True,  # Set to true on registration for smooth UX
-        role=payload.role,
-        onboarding_status=initial_status,
-        current_step=initial_status if payload.role else None,
-        account_status="active",
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
+        full_name=target_user.full_name,
+        db=db,
+        purpose="registration",
     )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
 
-    token = create_access_token(subject=new_user.id, extra_claims={"role": new_user.role, "email": new_user.email})
-    target = resolve_route(new_user)
+    return RegisterResponse(
+        success=True,
+        requires_verification=True,
+        email=email_clean,
+        message="Verification passcode sent to your email. Please enter the 6-digit code to continue.",
+        target="/verify-email",
+    )
+
+
+@router.post("/send-passcode", response_model=PasscodeResponse, tags=["Auth"])
+def send_passcode(payload: SendPasscodeRequest, db: Session = Depends(get_db)):
+    """Request a fresh 6-digit verification passcode for an email address."""
+    email_clean = payload.email.strip().lower()
+    user = db.query(User).filter(User.email == email_clean).first()
+    full_name = user.full_name if user else "Student"
+
+    # Cooldown check: prevent requesting more than once every 20 seconds
+    recent = (
+        db.query(EmailVerification)
+        .filter(
+            EmailVerification.email == email_clean,
+            EmailVerification.purpose == payload.purpose,
+            EmailVerification.created_at >= datetime.now(timezone.utc) - timedelta(seconds=20),
+        )
+        .first()
+    )
+    if recent:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Please wait a few moments before requesting another passcode.",
+        )
+
+    _create_and_send_passcode(
+        email=email_clean,
+        full_name=full_name,
+        db=db,
+        purpose=payload.purpose,
+    )
+
+    return PasscodeResponse(
+        success=True,
+        message=f"Passcode successfully sent to {email_clean}",
+        email=email_clean,
+        expires_in_seconds=600,
+    )
+
+
+@router.post("/verify-passcode", response_model=AuthResponse, tags=["Auth"])
+def verify_passcode(payload: VerifyPasscodeRequest, db: Session = Depends(get_db)):
+    """Validates submitted passcode, activates account, and issues authentication session."""
+    email_clean = payload.email.strip().lower()
+    submitted_code = payload.code.strip()
+
+    verification = (
+        db.query(EmailVerification)
+        .filter(
+            EmailVerification.email == email_clean,
+            EmailVerification.is_used == False,
+        )
+        .order_by(EmailVerification.created_at.desc())
+        .first()
+    )
+
+    if not verification:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active passcode found for this email. Please request a new code.",
+        )
+
+    now = datetime.now(timezone.utc)
+    expiry = verification.expires_at
+    if expiry.tzinfo is None:
+        expiry = expiry.replace(tzinfo=timezone.utc)
+
+    if now > expiry:
+        verification.is_used = True
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Passcode has expired. Please click resend to get a new code.",
+        )
+
+    if verification.attempts >= verification.max_attempts:
+        verification.is_used = True
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Too many incorrect attempts. Please request a new passcode.",
+        )
+
+    if verification.code.strip() != submitted_code:
+        verification.attempts += 1
+        db.commit()
+        remaining = max(0, verification.max_attempts - verification.attempts)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Incorrect passcode. {remaining} attempt(s) remaining.",
+        )
+
+    # Passcode is valid! Mark verified
+    verification.is_used = True
+
+    user = db.query(User).filter(User.email == email_clean).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User account not found.",
+        )
+
+    user.email_verified = True
+    if user.role == "student" and user.onboarding_status in ("email_verification", "role_selection", None):
+        user.onboarding_status = "profile"
+        user.current_step = "profile"
+    user.updated_at = datetime.now(timezone.utc)
+
+    db.commit()
+    db.refresh(user)
+
+    token = create_access_token(
+        subject=user.id,
+        extra_claims={"role": user.role, "email": user.email},
+    )
+    target = resolve_route(user)
 
     return AuthResponse(
         success=True,
-        user=UserRead.model_validate(new_user),
+        user=UserRead.model_validate(user),
         access_token=token,
         token_type="bearer",
         target=target,
@@ -109,143 +296,25 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     email_clean = payload.email.strip().lower()
     user = db.query(User).filter(User.email == email_clean).first()
 
-    if not user:
-        # If user doesn't exist, allow auto-creation if email looks like a demo/seed account
-        is_advisor = "advisor" in email_clean or "mentor" in email_clean
-        user_id = generate_uuid()
-        user = User(
-            id=user_id,
-            auth_user_id=f"auth-{user_id}",
-            full_name=email_clean.split("@")[0].replace(".", " ").title(),
-            email=email_clean,
-            password_hash=get_password_hash(payload.password),
-            auth_provider="email",
-            email_verified=True,
-            role="advisor" if is_advisor else "student",
-            onboarding_status="completed",
-            account_status="active",
-            advisor_verification_status="approved" if is_advisor else None,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+    # Strict authentication: verify user existence and bcrypt password hash
+    if not user or not user.password_hash or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password.",
+            headers={"WWW-Authenticate": "Bearer"},
         )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-    else:
-        # If user has a password, verify it
-        if user.password_hash and not verify_password(payload.password, user.password_hash):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect email or password.",
-            )
 
-    token = create_access_token(subject=user.id, extra_claims={"role": user.role, "email": user.email})
+    if user.account_status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Account is {user.account_status}. Please contact support.",
+        )
+
+    token = create_access_token(
+        subject=user.id,
+        extra_claims={"role": user.role, "email": user.email},
+    )
     target = resolve_route(user, payload.return_to)
-
-    return AuthResponse(
-        success=True,
-        user=UserRead.model_validate(user),
-        access_token=token,
-        token_type="bearer",
-        target=target,
-    )
-
-
-@router.post("/quick-demo-login", response_model=AuthResponse, tags=["Auth"])
-def quick_demo_login(payload: QuickDemoLoginRequest, db: Session = Depends(get_db)):
-    demo_accounts = {
-        "student": {
-            "email": "student@example.com",
-            "full_name": "Rafiul Islam",
-            "role": "student",
-            "intended_country": "Germany",
-            "education_level": "Undergraduate",
-            "institution": "BUET",
-            "subject_field": "Computer Science & Engineering",
-        },
-        "advisor": {
-            "email": "advisor@example.com",
-            "full_name": "Tanvir Ahmed",
-            "role": "advisor",
-            "headline": "Germany Master's Application Adviser",
-            "bio": "Admitted to TU Munich & TU Darmstadt. Helped 50+ students secure visas and admissions.",
-            "advisor_verification_status": "approved",
-        },
-        "admin": {
-            "email": "admin@example.com",
-            "full_name": "Mentora Admin",
-            "role": "admin",
-        },
-    }
-
-    info = demo_accounts[payload.role]
-    user = db.query(User).filter(User.email == info["email"]).first()
-
-    if not user:
-        user_id = f"user-{payload.role}-demo"
-        user = User(
-            id=user_id,
-            auth_user_id=f"auth-{payload.role}-demo",
-            full_name=info["full_name"],
-            email=info["email"],
-            password_hash=get_password_hash("DemoPass123!"),
-            auth_provider="email",
-            email_verified=True,
-            role=info["role"],
-            onboarding_status="completed",
-            account_status="active",
-            advisor_verification_status=info.get("advisor_verification_status"),
-            headline=info.get("headline"),
-            bio=info.get("bio"),
-            education_level=info.get("education_level"),
-            institution=info.get("institution"),
-            subject_field=info.get("subject_field"),
-            intended_country=info.get("intended_country"),
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-
-    token = create_access_token(subject=user.id, extra_claims={"role": user.role, "email": user.email})
-    target = resolve_route(user)
-
-    return AuthResponse(
-        success=True,
-        user=UserRead.model_validate(user),
-        access_token=token,
-        token_type="bearer",
-        target=target,
-    )
-
-
-@router.post("/google", response_model=AuthResponse, tags=["Auth"])
-def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
-    email_clean = payload.email.strip().lower()
-    user = db.query(User).filter(User.email == email_clean).first()
-
-    if not user:
-        user_id = generate_uuid()
-        user = User(
-            id=user_id,
-            auth_user_id=f"google-{user_id}",
-            full_name=payload.full_name,
-            email=email_clean,
-            auth_provider="google",
-            email_verified=True,
-            role="student",
-            onboarding_status="completed",
-            account_status="active",
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-
-    token = create_access_token(subject=user.id, extra_claims={"role": user.role, "email": user.email})
-    target = resolve_route(user)
 
     return AuthResponse(
         success=True,

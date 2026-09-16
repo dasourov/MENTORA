@@ -19,6 +19,10 @@ export function SiteNav() {
   const { isAuthenticated, user, signOut, resolveRoute } = useAuth();
 
   const dashboardTarget = user ? resolveRoute() : "/login";
+  const profileTarget =
+    user?.role === "student"
+      ? `/student/${user.username || user.id}`
+      : dashboardTarget;
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur-md transition-shadow duration-200">
@@ -43,12 +47,13 @@ export function SiteNav() {
             <div className="flex items-center gap-3">
               {/* Profile Chip */}
               <Link
-                to={dashboardTarget as any}
-                className="hidden sm:flex items-center gap-2.5 rounded-full border border-border bg-card p-1.5 pr-4 transition-all hover:border-primary/40 hover:shadow-xs"
+                to={profileTarget as any}
+                title="View & Edit Profile"
+                className="hidden sm:flex items-center gap-2.5 rounded-full border border-border bg-card p-1.5 pr-4 transition-all hover:border-primary/50 hover:bg-secondary/40 hover:shadow-xs group"
               >
                 <Avatar initials={user.full_name?.slice(0, 2).toUpperCase() || "ME"} size="sm" />
                 <div className="text-left text-xs">
-                  <p className="font-extrabold text-foreground leading-tight">{user.full_name}</p>
+                  <p className="font-extrabold text-foreground leading-tight group-hover:text-primary transition-colors">{user.full_name}</p>
                   <p className="text-[0.6875rem] font-semibold text-primary capitalize flex items-center gap-1">
                     {user.role === "advisor" ? (
                       <>
@@ -59,6 +64,7 @@ export function SiteNav() {
                         <GraduationCap className="h-3 w-3 text-primary" /> Student
                       </>
                     )}
+                    {user.username && <span className="text-muted-foreground font-normal">(@{user.username})</span>}
                   </p>
                 </div>
               </Link>
@@ -129,12 +135,17 @@ export function SiteNav() {
                       <p className="text-xs text-primary font-bold capitalize">{user.role || "User"}</p>
                     </div>
                   </div>
+                  <Button asChild variant="outline" className="w-full font-bold">
+                    <Link to={profileTarget as any} onClick={() => setOpen(false)}>
+                      My Profile
+                    </Link>
+                  </Button>
                   <Button asChild className="w-full font-bold">
                     <Link to={dashboardTarget as any} onClick={() => setOpen(false)}>
                       Go to Dashboard
                     </Link>
                   </Button>
-                  <Button variant="outline" onClick={signOut} className="w-full font-bold">
+                  <Button variant="ghost" onClick={signOut} className="w-full font-bold text-muted-foreground">
                     Sign Out
                   </Button>
                 </>

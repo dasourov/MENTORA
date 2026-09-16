@@ -37,14 +37,14 @@ function StudentOnboardingFlow() {
   const [loading, setLoading] = useState(false);
 
   // Form states
-  const [phone, setPhone] = useState(user?.phone_number || "+880 1711-000000");
+  const [phone, setPhone] = useState(user?.phone_number || "");
   const [country, setCountry] = useState(user?.country || "Bangladesh");
-  const [educationLevel, setEducationLevel] = useState(user?.education_level || "Bachelor's Degree");
-  const [institution, setInstitution] = useState(user?.institution || "Dhaka University");
-  const [subjectField, setSubjectField] = useState(user?.subject_field || "Computer Science");
+  const [educationLevel, setEducationLevel] = useState(user?.education_level || "Undergraduate / Bachelor's");
+  const [institution, setInstitution] = useState(user?.institution || "");
+  const [subjectField, setSubjectField] = useState(user?.subject_field || "");
   const [intendedCountry, setIntendedCountry] = useState(user?.intended_country || "Germany");
-  const [budget, setBudget] = useState(user?.budget || "৳10,000 - ৳15,000 / month");
-  const [servicesNeeded, setServicesNeeded] = useState<string[]>(user?.services_needed || ["University shortlisting", "Scholarship guidance"]);
+  const [budget, setBudget] = useState(user?.budget || "BDT 15–20 Lakhs / Year");
+  const [servicesNeeded, setServicesNeeded] = useState<string[]>(user?.services_needed || ["University Shortlisting", "SOP Feedback"]);
 
   const handleNext = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,6 +129,7 @@ function StudentOnboardingFlow() {
                     <Input
                       id="phone"
                       required
+                      placeholder="+880 1700-000000"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       className="h-11 rounded-xl border-border bg-background"
@@ -142,6 +143,7 @@ function StudentOnboardingFlow() {
                     <Input
                       id="country"
                       required
+                      placeholder="Bangladesh"
                       value={country}
                       onChange={(e) => setCountry(e.target.value)}
                       className="h-11 rounded-xl border-border bg-background"
@@ -172,7 +174,7 @@ function StudentOnboardingFlow() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl">
-                        {["HSC / A-Levels", "Bachelor's Degree", "Master's Degree", "Diploma"].map((l) => (
+                        {["HSC / A-Levels", "Undergraduate / Bachelor's", "Graduate / Master's", "Diploma", "PhD / Post-Graduate"].map((l) => (
                           <SelectItem key={l} value={l}>
                             {l}
                           </SelectItem>
@@ -188,6 +190,7 @@ function StudentOnboardingFlow() {
                     <Input
                       id="inst"
                       required
+                      placeholder="e.g. BUET, Dhaka University, NSU"
                       value={institution}
                       onChange={(e) => setInstitution(e.target.value)}
                       className="h-11 rounded-xl border-border bg-background"
@@ -201,6 +204,7 @@ function StudentOnboardingFlow() {
                     <Input
                       id="subject"
                       required
+                      placeholder="e.g. Computer Science, Mechanical Engineering, BBA"
                       value={subjectField}
                       onChange={(e) => setSubjectField(e.target.value)}
                       className="h-11 rounded-xl border-border bg-background"

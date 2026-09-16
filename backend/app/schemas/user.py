@@ -1,11 +1,13 @@
 from typing import Optional, List, Dict, Any, Literal
+import re
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict, field_validator
 
 
 class UserBase(BaseModel):
     full_name: str
     email: EmailStr
+    username: Optional[str] = None
     auth_provider: str = "email"
     email_verified: bool = False
     role: Optional[Literal["student", "advisor", "admin"]] = None
@@ -25,6 +27,16 @@ class UserBase(BaseModel):
     budget: Optional[str] = None
     services_needed: Optional[List[str]] = None
 
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == "":
+            return None
+        v = v.strip().lower()
+        if not re.match(r"^[a-z0-9_\-]{3,30}$", v):
+            raise ValueError("Username must be between 3 and 30 characters and contain only letters, numbers, underscores, or hyphens.")
+        return v
+
 
 class UserRead(UserBase):
     id: str
@@ -37,6 +49,7 @@ class UserRead(UserBase):
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
+    username: Optional[str] = None
     role: Optional[Literal["student", "advisor", "admin"]] = None
     email_verified: Optional[bool] = None
     onboarding_status: Optional[str] = None
@@ -53,6 +66,16 @@ class UserUpdate(BaseModel):
     intended_country: Optional[str] = None
     budget: Optional[str] = None
     services_needed: Optional[List[str]] = None
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == "":
+            return None
+        v = v.strip().lower()
+        if not re.match(r"^[a-z0-9_\-]{3,30}$", v):
+            raise ValueError("Username must be between 3 and 30 characters and contain only letters, numbers, underscores, or hyphens.")
+        return v
 
 
 class OnboardingStepRequest(BaseModel):
