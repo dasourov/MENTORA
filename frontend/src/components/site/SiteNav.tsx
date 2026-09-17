@@ -10,7 +10,6 @@ const navItems = [
   { label: "Find Mentors", to: "/advisers" },
   { label: "How It Works", to: "/how-it-works" },
   { label: "Services", to: "/services" },
-  { label: "Become a Mentor", to: "/become-an-adviser" },
   { label: "Resources", to: "/resources" },
 ];
 

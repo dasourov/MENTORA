@@ -117,10 +117,6 @@ function HowItWorks() {
       {/* Hero Header - compact spacing */}
       <header className="relative overflow-hidden bg-gradient-to-b from-muted/30 via-background to-background pt-10 pb-4 sm:pt-14 sm:pb-6">
         <div className="mx-auto max-w-5xl px-4 text-center sm:px-6 lg:px-8">
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary shadow-xs">
-            <Sparkles className="h-3.5 w-3.5" />
-            <span>The Mentora Methodology</span>
-          </div>
 
           <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl lg:text-5xl font-serif">
             A Structured, Classic Pathway to Global Higher Education
